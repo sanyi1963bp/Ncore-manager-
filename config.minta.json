@@ -1,0 +1,10 @@
+{
+    "username": "",
+    "password": "",
+    "download_path": "C:/Letoltesek/torrent",
+    "covers_path": "./boritok",
+    "database_path": "./ncore_konyvtar.db",
+    "last_history_page": 1,
+    "request_delay": 0.5,
+    "torrent_watch_folder": "C:/Letoltesek/torrent"
+}
