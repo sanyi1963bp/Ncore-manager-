@@ -12,6 +12,7 @@ class BookTableModel(QAbstractTableModel):
         self.books: List[Dict] = []
         self.columns = []
         self.marked_ids: Set[str] = set()
+        self.filtered_columns: Set[str] = set()   # oszlopszűrős oszlopok (🔍 a fejlécben)
 
     def rowCount(self, parent=None):
         return len(self.books)
@@ -53,7 +54,10 @@ class BookTableModel(QAbstractTableModel):
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            return self.columns[section]["label"]
+            col = self.columns[section]
+            if col["name"] in self.filtered_columns:
+                return f"🔍 {col['label']}"
+            return col["label"]
         return None
 
     def flags(self, index):

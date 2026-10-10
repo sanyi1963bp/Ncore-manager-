@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QStyledItemDelegate, QToolBar,
     QFrame, QDialog, QFormLayout, QTabWidget, QCheckBox, QTextEdit,
     QSpinBox, QSlider, QMenu, QSizePolicy, QListWidget, QListWidgetItem,
-    QSplitter, QScrollArea
+    QSplitter, QScrollArea, QWidgetAction
 )
 from PySide6.QtCore import Qt, QSortFilterProxyModel, QTimer, QAbstractTableModel, QThread, Signal, QUrl, QEvent, QItemSelectionModel
 from PySide6.QtGui import (

@@ -91,6 +91,10 @@ class MainWindow(QMainWindow):
         self.table_view.horizontalHeader().sectionClicked.connect(self.on_header_clicked)
         self.table_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table_view.customContextMenuRequested.connect(self.show_context_menu)
+        header = self.table_view.horizontalHeader()
+        header.setContextMenuPolicy(Qt.CustomContextMenu)
+        header.customContextMenuRequested.connect(self.show_header_menu)
+        self.column_filters: Dict[str, str] = {}   # oszlopnév → keresett szöveg
 
         self.model = BookTableModel()
         self.proxy = QSortFilterProxyModel()
@@ -257,6 +261,15 @@ class MainWindow(QMainWindow):
         )
         tl.addWidget(self.format_combo)
 
+        self.lbl_col_filters = QLabel("")
+        self.lbl_col_filters.setWordWrap(True)
+        self.lbl_col_filters.setVisible(False)
+        tl.addWidget(self.lbl_col_filters)
+        self.btn_clear_col_filters = QPushButton("✖ Oszlopszűrők törlése")
+        self.btn_clear_col_filters.setVisible(False)
+        self.btn_clear_col_filters.clicked.connect(self.clear_column_filters)
+        tl.addWidget(self.btn_clear_col_filters)
+
         tl.addStretch()
 
         # Műveletek/Szűrés | Kijelölt könyvek | Napló — húzható elválasztókkal
@@ -359,6 +372,8 @@ class MainWindow(QMainWindow):
 
         self.model.clear_marks()
         self.update_marked_list()
+        self.column_filters.clear()
+        self._update_column_filter_ui()
 
         self.order_by = "feltoltve_datum"
         self.desc = True
@@ -438,12 +453,14 @@ class MainWindow(QMainWindow):
         if self.use_cache:
             self.full_cache = search_books(
                 query=query, formatum=formatum,
-                limit=0, order_by=self.order_by, desc=self.desc
+                limit=0, order_by=self.order_by, desc=self.desc,
+                column_filters=self.column_filters
             )
             self.total_count = len(self.full_cache)
         else:
             self.full_cache = []
-            self.total_count = count_books(query=query, formatum=formatum)
+            self.total_count = count_books(query=query, formatum=formatum,
+                                           column_filters=self.column_filters)
 
     def _populate_formats(self):
         """Formátumok feltöltése - csak érvényes e-book/szöveg típusok."""
@@ -499,7 +516,8 @@ class MainWindow(QMainWindow):
                 limit=self.page_size,
                 offset=self.current_page * self.page_size,
                 order_by=self.order_by,
-                desc=self.desc
+                desc=self.desc,
+                column_filters=self.column_filters
             )
         self.model.set_books(books)
         self.update_ui()
@@ -553,31 +571,86 @@ class MainWindow(QMainWindow):
             return
 
         src_index = self.proxy.mapToSource(index)
-        col_idx = src_index.column()
-        col_name = self.model.columns[col_idx]["name"]
-        col_label = self.model.columns[col_idx]["label"]
-        cell_value = self.model.data(src_index, Qt.DisplayRole) or ""
+        col = self.model.columns[src_index.column()]
+        col_name, col_label = col["name"], col["label"]
 
         menu = QMenu(self)
 
-        menu.addAction(
-            f"↑ Rendezés: {col_label} - növekvő",
-            lambda cn=col_name: self._sort_column(cn, False)
-        )
-        menu.addAction(
-            f"↓ Rendezés: {col_label} - csökkenő",
-            lambda cn=col_name: self._sort_column(cn, True)
-        )
+        # Üres beviteli mező: keresés csak ebben az oszlopban (Enter)
+        box = QWidget()
+        box_lay = QVBoxLayout(box)
+        box_lay.setContentsMargins(8, 6, 8, 6)
+        box_lay.addWidget(QLabel(f"🔍 Keresés a(z) <b>{col_label}</b> oszlopban:"))
+        edit = QLineEdit()
+        edit.setPlaceholderText("Írd be, majd Enter…")
+        edit.setMinimumWidth(260)
+        box_lay.addWidget(edit)
+        wa = QWidgetAction(menu)
+        wa.setDefaultWidget(box)
+        menu.addAction(wa)
 
-        if col_name in SEARCHABLE_COLUMNS and cell_value.strip():
+        def apply():
+            self.set_column_filter(col_name, edit.text().strip())
+            menu.close()
+        edit.returnPressed.connect(apply)
+
+        if col_name in self.column_filters:
             menu.addSeparator()
-            display = cell_value if len(cell_value) <= 40 else cell_value[:37] + "..."
             menu.addAction(
-                f"🔍 Keresés erre: {display}",
-                lambda val=cell_value.strip(): self._search_from_context(val)
+                f"✖ Szűrő törlése: {col_label} = „{self.column_filters[col_name]}”",
+                lambda: self.set_column_filter(col_name, "")
             )
+        if len(self.column_filters) > 1 or (
+                self.column_filters and col_name not in self.column_filters):
+            menu.addAction("✖ Minden oszlopszűrő törlése", self.clear_column_filters)
 
+        QTimer.singleShot(0, edit.setFocus)
         menu.exec(self.table_view.viewport().mapToGlobal(pos))
+
+    def show_header_menu(self, pos):
+        """Oszlopfejlécre jobb klikk: rendezés (és az oszlop szűrőjének törlése)."""
+        header = self.table_view.horizontalHeader()
+        section = header.logicalIndexAt(pos)
+        if section < 0 or section >= len(self.model.columns):
+            return
+        col = self.model.columns[section]
+        col_name, col_label = col["name"], col["label"]
+
+        menu = QMenu(self)
+        menu.addAction(f"↑ Rendezés: {col_label} – növekvő",
+                       lambda: self._sort_column(col_name, False))
+        menu.addAction(f"↓ Rendezés: {col_label} – csökkenő",
+                       lambda: self._sort_column(col_name, True))
+        if col_name in self.column_filters:
+            menu.addSeparator()
+            menu.addAction(f"✖ Szűrő törlése: „{self.column_filters[col_name]}”",
+                           lambda: self.set_column_filter(col_name, ""))
+        menu.exec(header.mapToGlobal(pos))
+
+    # ---- Oszloponkénti szűrők ----
+    def set_column_filter(self, col_name: str, text: str):
+        if text:
+            self.column_filters[col_name] = text
+        else:
+            self.column_filters.pop(col_name, None)
+        self._update_column_filter_ui()
+        self.refresh_data(reset_page=True)
+
+    def clear_column_filters(self):
+        self.column_filters.clear()
+        self._update_column_filter_ui()
+        self.refresh_data(reset_page=True)
+
+    def _update_column_filter_ui(self):
+        labels = {c["nev"]: c["cimke"] for c in self.ls.get_all_columns()}
+        self.model.filtered_columns = set(self.column_filters)
+        self.model.headerDataChanged.emit(
+            Qt.Horizontal, 0, max(0, self.model.columnCount() - 1))
+        if self.column_filters:
+            parts = [f"{labels.get(c, c)}: „{t}”" for c, t in self.column_filters.items()]
+            self.lbl_col_filters.setText("<b>Oszlopszűrők:</b><br>" + "<br>".join(parts))
+        self.lbl_col_filters.setVisible(bool(self.column_filters))
+        self.btn_clear_col_filters.setVisible(bool(self.column_filters))
 
     def _sort_column(self, col_name: str, descending: bool):
         """Rendezés a megadott oszlop szerint."""

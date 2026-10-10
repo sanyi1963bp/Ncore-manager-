@@ -144,34 +144,54 @@ def save_book(book: Dict[str, Any]) -> bool:
             return False
 
 
+# Oszlopok, amelyekre oszloponkénti szűrő tehető (a helyi menüből)
+_FILTERABLE_COLUMNS = {
+    "ncore_id", "szerzo", "cim", "sorozat", "sorozat_szama", "formatum",
+    "kiadas_eve", "meret", "feltoltve_datum", "cimkek", "kiado", "isbn",
+}
+
+
+def _build_where(query: str = "", formatum: Optional[str] = None,
+                 column_filters: Optional[Dict[str, str]] = None):
+    """WHERE feltétel: általános keresés + formátum + oszloponkénti szűrők."""
+    where_clauses = []
+    params = []
+
+    if query:
+        where_clauses.append(
+            "(cim LIKE ? OR szerzo LIKE ? OR cimkek LIKE ?"
+            " OR ncore_id LIKE ? OR sorozat LIKE ?)"
+        )
+        q = f"%{query}%"
+        params.extend([q, q, q, q, q])
+
+    if formatum:
+        where_clauses.append("formatum = ?")
+        params.append(formatum)
+
+    for col, text in (column_filters or {}).items():
+        if col in _FILTERABLE_COLUMNS and text:
+            where_clauses.append(f"{col} LIKE ?")
+            params.append(f"%{text}%")
+
+    where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+    return where_sql, params
+
+
 def search_books(
     query: str = "",
     formatum: Optional[str] = None,
     limit: int = 0,
     offset: int = 0,
     order_by: str = "feltoltve_datum",
-    desc: bool = True
+    desc: bool = True,
+    column_filters: Optional[Dict[str, str]] = None,
 ) -> List[Dict]:
     """Könyvek keresése. limit=0 esetén összes könyvet visszaadja."""
     with get_connection() as conn:
         cursor = conn.cursor()
         
-        where_clauses = []
-        params = []
-        
-        if query:
-            where_clauses.append(
-                "(cim LIKE ? OR szerzo LIKE ? OR cimkek LIKE ?"
-                " OR ncore_id LIKE ? OR sorozat LIKE ?)"
-            )
-            q = f"%{query}%"
-            params.extend([q, q, q, q, q])
-        
-        if formatum:
-            where_clauses.append("formatum = ?")
-            params.append(formatum)
-        
-        where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        where_sql, params = _build_where(query, formatum, column_filters)
         order_dir = "DESC" if desc else "ASC"
         
         # Ha limit = 0, akkor nincs LIMIT
@@ -212,28 +232,14 @@ def get_book_by_ncore_id(ncore_id: str) -> Optional[Dict]:
         return dict(row) if row else None
 
 
-def count_books(query: str = "", formatum: Optional[str] = None) -> int:
+def count_books(query: str = "", formatum: Optional[str] = None,
+                column_filters: Optional[Dict[str, str]] = None) -> int:
     """Könyvek számolása (kereséshez)."""
     with get_connection() as conn:
         cursor = conn.cursor()
         
-        where_clauses = []
-        params = []
-        
-        if query:
-            where_clauses.append(
-                "(cim LIKE ? OR szerzo LIKE ? OR cimkek LIKE ?"
-                " OR ncore_id LIKE ? OR sorozat LIKE ?)"
-            )
-            q = f"%{query}%"
-            params.extend([q, q, q, q, q])
-        
-        if formatum:
-            where_clauses.append("formatum = ?")
-            params.append(formatum)
-        
-        where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
-        
+        where_sql, params = _build_where(query, formatum, column_filters)
+
         cursor.execute(f"SELECT COUNT(*) FROM konyvek {where_sql}", params)
         return cursor.fetchone()[0]
 
