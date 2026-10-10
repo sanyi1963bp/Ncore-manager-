@@ -238,6 +238,26 @@ class LayoutState:
             if c["nev"] in visibility:
                 c["lathato"] = bool(visibility[c["nev"]])
 
+    def reorder_columns(self, visible_order, widths=None):
+        """Látható oszlopok új sorrendje (fogd és vidd után).
+
+        A rejtett oszlopok a helyükön maradnak; a látható oszlopok
+        helyeire az új sorrend kerül. widths: {oszlopnév: szélesség}.
+        """
+        all_cols = self.get_all_columns()
+        by_name = {c["nev"]: c for c in all_cols}
+        for name, w in (widths or {}).items():
+            if name in by_name:
+                by_name[name]["szelesseg"] = w
+        slots = [i for i, c in enumerate(all_cols) if c.get("lathato", True)]
+        ordered = [by_name[n] for n in visible_order if n in by_name]
+        if len(ordered) != len(slots):
+            return
+        new_cols = list(all_cols)
+        for slot, col in zip(slots, ordered):
+            new_cols[slot] = col
+        self.set("tablazat", "oszlopok", new_cols)
+
     def get_columns_for_model(self):
         """Visszaadja a látható oszlopokat a model számára [{name, label}, ...]."""
         return [{"name": c["nev"], "label": c["cimke"]}

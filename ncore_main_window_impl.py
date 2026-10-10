@@ -94,6 +94,9 @@ class MainWindow(QMainWindow):
         header = self.table_view.horizontalHeader()
         header.setContextMenuPolicy(Qt.CustomContextMenu)
         header.customContextMenuRequested.connect(self.show_header_menu)
+        # Oszlopok sorrendje fogd és vidd módszerrel
+        header.setSectionsMovable(True)
+        header.sectionMoved.connect(self._on_column_moved)
         self.column_filters: Dict[str, str] = {}   # oszlopnév → keresett szöveg
 
         self.model = BookTableModel()
@@ -405,12 +408,34 @@ class MainWindow(QMainWindow):
             [self.table_view.columnWidth(i) for i in range(self.model.columnCount())]
         )
         self.ls.set_columns_visibility(visibility)
+        self._reload_columns()
+
+    def _reload_columns(self):
+        """Oszlopok újratöltése a layout_state-ből (szélességekkel együtt)."""
         self.model.beginResetModel()
         self.load_columns_from_state()
         self.model.endResetModel()
         for i, w in enumerate(self.ls.get_column_widths()):
             if i < self.model.columnCount():
                 self.table_view.setColumnWidth(i, w)
+
+    def _on_column_moved(self, logical, old_visual, new_visual):
+        """Fejléc áthúzása után az új sorrendet a modellbe és a mentésbe
+        írjuk; a fejléc vizuális sorrendje visszaáll (logikai = vizuális),
+        így a szélességek, a rendezés és a szűrők indexei egyszerűek maradnak."""
+        header = self.table_view.horizontalHeader()
+        cols = self.model.columns
+        order = [cols[header.logicalIndex(v)]["name"] for v in range(header.count())]
+        widths = {c["name"]: self.table_view.columnWidth(i) for i, c in enumerate(cols)}
+
+        def apply():
+            header.blockSignals(True)
+            for v in range(header.count()):          # vizuális sorrend visszaállítása
+                header.moveSection(header.visualIndex(v), v)
+            header.blockSignals(False)
+            self.ls.reorder_columns(order, widths)
+            self._reload_columns()
+        QTimer.singleShot(0, apply)
 
     def apply_saved_sizes(self):
         widths = self.ls.get_column_widths()
