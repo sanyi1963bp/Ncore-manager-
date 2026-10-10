@@ -601,14 +601,20 @@ class MainWindow(QMainWindow):
 
         menu = QMenu(self)
 
-        # Üres beviteli mező: keresés csak ebben az oszlopban (Enter)
+        # Keresőmező a cella szövegével előtöltve: szerkeszthető, Enter → keresés
+        # csak ebben az oszlopban
+        cell_value = (self.model.data(src_index, Qt.DisplayRole) or "").strip()
         box = QWidget()
         box_lay = QVBoxLayout(box)
         box_lay.setContentsMargins(8, 6, 8, 6)
-        box_lay.addWidget(QLabel(f"🔍 Keresés a(z) <b>{col_label}</b> oszlopban:"))
-        edit = QLineEdit()
+        box_lay.addWidget(QLabel(f"🔍 Keresés a(z) <b>{col_label}</b> oszlopban "
+                                 f"<small>(szerkeszd, majd Enter)</small>:"))
+        edit = QLineEdit(cell_value)
         edit.setPlaceholderText("Írd be, majd Enter…")
-        edit.setMinimumWidth(260)
+        edit.setClearButtonEnabled(True)
+        text_w = edit.fontMetrics().horizontalAdvance(cell_value) + 40
+        edit.setMinimumWidth(max(260, min(text_w, 700)))
+        edit.setCursorPosition(len(cell_value))
         box_lay.addWidget(edit)
         wa = QWidgetAction(menu)
         wa.setDefaultWidget(box)
@@ -618,16 +624,6 @@ class MainWindow(QMainWindow):
             self.set_column_filter(col_name, edit.text().strip())
             menu.close()
         edit.returnPressed.connect(apply)
-
-        # Egy kattintás: keresés a cella tartalmára, ugyanebben az oszlopban
-        cell_value = (self.model.data(src_index, Qt.DisplayRole) or "").strip()
-        if cell_value:
-            display = cell_value if len(cell_value) <= 40 else cell_value[:37] + "..."
-            menu.addSeparator()
-            menu.addAction(
-                f"🔍 Keresés erre: „{display}”",
-                lambda: self.set_column_filter(col_name, cell_value)
-            )
 
         if col_name in self.column_filters:
             menu.addSeparator()
