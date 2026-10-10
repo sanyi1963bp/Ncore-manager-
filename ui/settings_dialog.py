@@ -1,4 +1,5 @@
 from .common import *
+from downloader import Downloader
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
@@ -25,8 +26,23 @@ class SettingsDialog(QDialog):
         self.pass_edit.setEchoMode(QLineEdit.Password)
         gen_lay.addRow("Jelszó:", self.pass_edit)
 
+        # Letöltési mappa: ide kerülnek a letöltött .torrent fájlok
         self.path_edit = QLineEdit(curr.get("torrent_watch_folder", ""))
-        gen_lay.addRow("Torrent mappa:", self.path_edit)
+        self.path_edit.setPlaceholderText(
+            f"üres = {Downloader.resolve_folder(dict(curr, torrent_watch_folder=''))}")
+        path_row = QHBoxLayout()
+        path_row.addWidget(self.path_edit, 1)
+        btn_browse = QPushButton("📁 Tallózás…")
+        btn_browse.clicked.connect(self._browse_download_folder)
+        path_row.addWidget(btn_browse)
+        btn_open = QPushButton("📂 Megnyitás")
+        btn_open.setToolTip("A letöltési mappa megnyitása a Fájlkezelőben")
+        btn_open.clicked.connect(self._open_download_folder)
+        path_row.addWidget(btn_open)
+        gen_lay.addRow("Letöltési mappa:", path_row)
+        gen_lay.addRow("", QLabel(
+            "<small>Ide kerülnek a letöltött <b>.torrent</b> fájlok. Érdemes a "
+            "torrentkliensed figyelt (watch) mappáját megadni.</small>"))
 
         tabs.addTab(gen_tab, "Fiók")
 
@@ -190,6 +206,18 @@ class SettingsDialog(QDialog):
         self.layout_state.save()
         self.parent().apply_font_size(self.font_spin.value())  # stíluslapot is újragenerálja
         self.accept()
+
+    def _browse_download_folder(self):
+        start = self.path_edit.text().strip() or Downloader.resolve_folder(config.load_config())
+        folder = QFileDialog.getExistingDirectory(self, "Letöltési mappa kiválasztása", start)
+        if folder:
+            self.path_edit.setText(os.path.normpath(folder))
+
+    def _open_download_folder(self):
+        cfg = dict(config.load_config(), torrent_watch_folder=self.path_edit.text().strip())
+        folder = Downloader.resolve_folder(cfg)
+        os.makedirs(folder, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
 
     def _save_layout_default(self):
         self.parent().save_current_state()

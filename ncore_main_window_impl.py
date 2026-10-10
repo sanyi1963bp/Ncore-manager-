@@ -852,15 +852,29 @@ class MainWindow(QMainWindow):
             return
         self._show_log_panel(True)
         self.log_text.clear()
+        folder = self.downloader.download_path
         self.log(f"📥 {len(ncore_ids)} torrent letöltése indul...")
+        self.log(f"📁 Mappa: {folder}")
         ok = 0
         for nid in ncore_ids:
             if self.downloader.download_by_ncore_id(nid):
                 ok += 1
-                self.log(f"✅ {nid} letöltve ({ok}/{len(ncore_ids)})")
+                name = os.path.basename(self.downloader.last_file or nid)
+                self.log(f"✅ {name} ({ok}/{len(ncore_ids)})")
             else:
                 self.log(f"❌ {nid} sikertelen")
+            QApplication.processEvents()
         self.log(f"📥 Letöltés kész: {ok}/{len(ncore_ids)} sikeres")
+        self.log(f"📁 Mentve ide: {folder}")
+        if ok:
+            reply = QMessageBox.question(
+                self, "Letöltés kész",
+                f"{ok} .torrent fájl mentve ide:\n\n{folder}\n\n"
+                "Megnyitod a mappát?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
 
     # ======================== ÁLLJ / KILÉPÉS ========================
     def stop_all(self):

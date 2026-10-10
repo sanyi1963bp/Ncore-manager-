@@ -57,3 +57,4 @@ dist/
 
 # Letöltött .torrent fájlok
 torrents/
+*.torrent
