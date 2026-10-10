@@ -594,6 +594,16 @@ class MainWindow(QMainWindow):
             menu.close()
         edit.returnPressed.connect(apply)
 
+        # Egy kattintás: keresés a cella tartalmára, ugyanebben az oszlopban
+        cell_value = (self.model.data(src_index, Qt.DisplayRole) or "").strip()
+        if cell_value:
+            display = cell_value if len(cell_value) <= 40 else cell_value[:37] + "..."
+            menu.addSeparator()
+            menu.addAction(
+                f"🔍 Keresés erre: „{display}”",
+                lambda: self.set_column_filter(col_name, cell_value)
+            )
+
         if col_name in self.column_filters:
             menu.addSeparator()
             menu.addAction(
