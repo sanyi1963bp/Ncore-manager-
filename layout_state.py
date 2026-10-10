@@ -78,7 +78,9 @@ BUILTIN_DEFAULT: Dict[str, Any] = {
             {"nev": "kiadas_eve",      "cimke": "Év",         "szelesseg": 60,  "lathato": True},
             {"nev": "meret",           "cimke": "Méret",      "szelesseg": 80,  "lathato": True},
             {"nev": "feltoltve_datum", "cimke": "Feltöltve",  "szelesseg": 100, "lathato": True},
-            {"nev": "cimkek",          "cimke": "Címkék",     "szelesseg": 150, "lathato": False}
+            {"nev": "cimkek",          "cimke": "Címkék",     "szelesseg": 150, "lathato": False},
+            {"nev": "kiado",           "cimke": "Kiadó",      "szelesseg": 140, "lathato": False},
+            {"nev": "isbn",            "cimke": "ISBN",       "szelesseg": 120, "lathato": False}
         ],
         "sor_magassag": 28,
         "valtakozo_sorok": True,
@@ -209,30 +211,37 @@ class LayoutState:
 
     # ---- Segéd: oszlopok konvertálása a BookTableModel-hez ----
 
-    def get_columns_for_model(self):
-        """Visszaadja az oszlopokat a model számára [{name, label}, ...].
-        
-        Ha a mentett állapotban nincs ncore_id oszlop, automatikusan
-        hozzáadja elsőként (régi layout_state.json kompatibilitás).
+    def get_all_columns(self):
+        """Az összes választható oszlop (láthatók és rejtettek), sorrendben.
+
+        A régi layout_state.json-ból hiányzó beépített oszlopok (pl. ncore_id,
+        kiado, isbn) rejtettként hozzáadódnak; az ncore_id elsőként, láthatóan.
         """
-        cols = self.get("tablazat", "oszlopok", default=[])
-        result = [{"name": c["nev"], "label": c["cimke"]} for c in cols if c.get("lathato", True)]
-        
-        # Biztosítjuk, hogy ncore_id mindig az első oszlop legyen
-        has_ncore = any(c["name"] == "ncore_id" for c in result)
-        if not has_ncore and result:
-            result.insert(0, {"name": "ncore_id", "label": "Torrent ID"})
-            # Frissítjük a mentett állapotot is
-            saved_cols = self.get("tablazat", "oszlopok", default=[])
-            has_saved = any(c["nev"] == "ncore_id" for c in saved_cols)
-            if not has_saved:
-                saved_cols.insert(0, {
-                    "nev": "ncore_id", "cimke": "Torrent ID",
-                    "szelesseg": 90, "lathato": True
-                })
-                self.set("tablazat", "oszlopok", saved_cols)
-        
-        return result
+        saved_cols = self.get("tablazat", "oszlopok", default=[])
+        names = {c["nev"] for c in saved_cols}
+        changed = False
+        for c in BUILTIN_DEFAULT["tablazat"]["oszlopok"]:
+            if c["nev"] in names:
+                continue
+            if c["nev"] == "ncore_id":
+                saved_cols.insert(0, dict(c))
+            else:
+                saved_cols.append(dict(c, lathato=False))
+            changed = True
+        if changed:
+            self.set("tablazat", "oszlopok", saved_cols)
+        return saved_cols
+
+    def set_columns_visibility(self, visibility: Dict[str, bool]):
+        """Oszlopok láthatóságának beállítása {oszlopnév: látható}."""
+        for c in self.get_all_columns():
+            if c["nev"] in visibility:
+                c["lathato"] = bool(visibility[c["nev"]])
+
+    def get_columns_for_model(self):
+        """Visszaadja a látható oszlopokat a model számára [{name, label}, ...]."""
+        return [{"name": c["nev"], "label": c["cimke"]}
+                for c in self.get_all_columns() if c.get("lathato", True)]
 
     def get_column_widths(self):
         """Visszaadja a látható oszlopok szélességét listában."""

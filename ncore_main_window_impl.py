@@ -383,6 +383,20 @@ class MainWindow(QMainWindow):
             ]
         self.model.columns = cols
 
+    def apply_column_visibility(self, visibility):
+        """Oszlopok ki/bekapcsolása (Beállítások → Oszlopok) azonnal."""
+        # Előbb a jelenlegi szélességek mentése a régi láthatóság szerint
+        self.ls.set_column_widths(
+            [self.table_view.columnWidth(i) for i in range(self.model.columnCount())]
+        )
+        self.ls.set_columns_visibility(visibility)
+        self.model.beginResetModel()
+        self.load_columns_from_state()
+        self.model.endResetModel()
+        for i, w in enumerate(self.ls.get_column_widths()):
+            if i < self.model.columnCount():
+                self.table_view.setColumnWidth(i, w)
+
     def apply_saved_sizes(self):
         widths = self.ls.get_column_widths()
         for i, w in enumerate(widths):

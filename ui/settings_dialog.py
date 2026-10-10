@@ -64,6 +64,30 @@ class SettingsDialog(QDialog):
         app_lay.addStretch()
         tabs.addTab(app_tab, "Megjelenés")
 
+        # ---- Oszlopok fül ----
+        col_tab = QWidget()
+        col_lay = QVBoxLayout(col_tab)
+        col_lay.addWidget(QLabel(
+            "<b>Táblázat oszlopai</b><br>"
+            "Jelöld be, mely oszlopok látszódjanak a középső táblázatban."
+        ))
+        col_lay.addSpacing(8)
+        self.col_checks = {}
+        for c in self.layout_state.get_all_columns():
+            cb = QCheckBox(c["cimke"])
+            cb.setChecked(c.get("lathato", True))
+            self.col_checks[c["nev"]] = cb
+            col_lay.addWidget(cb)
+        col_lay.addSpacing(8)
+        col_btns = QHBoxLayout()
+        btn_all = QPushButton("Mind")
+        btn_all.clicked.connect(lambda: [cb.setChecked(True) for cb in self.col_checks.values()])
+        col_btns.addWidget(btn_all)
+        col_btns.addStretch()
+        col_lay.addLayout(col_btns)
+        col_lay.addStretch()
+        tabs.addTab(col_tab, "Oszlopok")
+
         # ---- Elrendezés fül ----
         layout_tab = QWidget()
         lt_lay = QVBoxLayout(layout_tab)
@@ -145,6 +169,13 @@ class SettingsDialog(QDialog):
             )
             return
 
+        if not any(cb.isChecked() for cb in self.col_checks.values()):
+            QMessageBox.warning(
+                self, "Nincs oszlop",
+                "Legalább egy oszlopot jelölj be a táblázathoz!"
+            )
+            return
+
         config.set("username", username)
         config.set("password", password)
         config.set("torrent_watch_folder", self.path_edit.text().strip())
@@ -153,6 +184,9 @@ class SettingsDialog(QDialog):
         self.config_gui.set("theme", self.theme_combo.currentData())
         self.config_gui.save()
         self.layout_state.set("altalanos", "cache_hasznalat", self.cb_cache.isChecked())
+        self.parent().apply_column_visibility(
+            {name: cb.isChecked() for name, cb in self.col_checks.items()}
+        )
         self.layout_state.save()
         self.parent().apply_font_size(self.font_spin.value())  # stíluslapot is újragenerálja
         self.accept()
