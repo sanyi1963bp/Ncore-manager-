@@ -1,25 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-run_ncore.py
-============
-Indító szkript a nCore Scraper GUI-hoz (Main_window.py).
-PyInstaller --onedir módhoz optimalizálva.
-
-A sys.frozen ellenőrzés gondoskodik róla, hogy az exe mellé
-kerüljön a munkakönyvtár, így a config.json, boritok/, *.db
-helyesen relatív elérési úttal találhatók.
-"""
-
-import sys
+"""Stabil indító a refaktorált nCore Scraperhez."""
 import os
+import sys
+from pathlib import Path
 
-# Ha PyInstaller csomagból fut: exe könyvtárára állj
-if getattr(sys, 'frozen', False):
-    os.chdir(os.path.dirname(sys.executable))
+# Mindig a run_ncore.py valódi könyvtára legyen az importálási alap.
+BASE_DIR = Path(__file__).resolve().parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+os.chdir(BASE_DIR)
+
+# PyInstaller esetén is az EXE könyvtárából dolgozunk.
+if getattr(sys, "frozen", False):
+    os.chdir(Path(sys.executable).resolve().parent)
 
 from PySide6.QtWidgets import QApplication
-from Main_window import MainWindow
+from ncore_main_window_impl import MainWindow
+
 
 def main():
     app = QApplication(sys.argv)
@@ -27,6 +25,7 @@ def main():
     win = MainWindow()
     win.show()
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()

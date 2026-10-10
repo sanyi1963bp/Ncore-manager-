@@ -54,3 +54,6 @@ backups/
 build/
 dist/
 *.spec
+
+# Letöltött .torrent fájlok
+torrents/
