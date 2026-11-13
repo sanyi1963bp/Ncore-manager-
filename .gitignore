@@ -43,6 +43,10 @@ desktop.ini
 # Bejelentkezési adatok – a config.json-ban szabad szövegben van a jelszó!
 config.json
 
+# Runtime konfigurációk (személyre szabott beállítások)
+gui_config.json
+layout_state.json
+
 # Adatbázis-mentések
 backups/
 

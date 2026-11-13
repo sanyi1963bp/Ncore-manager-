@@ -200,23 +200,6 @@ class GUIConfig:
             background: {t['accent']};
             color: {t['accent_text']};
         }}
-        QMainWindow::separator {{
-            background: {t['border']};
-            width: 6px;
-            height: 6px;
-        }}
-        QMainWindow::separator:hover {{
-            background: {t['accent']};
-        }}
-        QSplitter::handle {{
-            background: {t['border']};
-        }}
-        QSplitter::handle:vertical {{
-            height: 6px;
-        }}
-        QSplitter::handle:hover {{
-            background: {t['accent']};
-        }}
         """
 
 _config_instance: Optional[GUIConfig] = None

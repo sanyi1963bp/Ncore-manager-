@@ -20,28 +20,13 @@ class Downloader:
         self.ncore = NCoreSession()
         self.log_callback = log_callback or print
         self.config = load_config()
-        self.last_file = None
-
-    @staticmethod
-    def resolve_folder(cfg: dict) -> str:
-        """A letöltési mappa abszolút útvonala.
-
-        Sorrend: torrent_watch_folder (Beállítások), ha nem üres;
-        különben download_path; végül ./torrents. Az üres érték NEM
-        jelentheti a program mappáját (korábbi hiba).
-        """
-        folder = (cfg.get("torrent_watch_folder") or "").strip()
-        if not folder:
-            folder = (cfg.get("download_path") or "").strip() or "./torrents"
-        return os.path.abspath(folder)
-
-    @property
-    def download_path(self) -> str:
-        # Mindig a friss beállítást használjuk (újraindítás nélkül is)
-        self.config = load_config()
-        path = self.resolve_folder(self.config)
-        os.makedirs(path, exist_ok=True)
-        return path
+        self.download_path = self.config.get("torrent_watch_folder", self.config.get("download_path", "./torrents"))
+        
+        if not os.path.exists(self.download_path):
+            try:
+                os.makedirs(self.download_path)
+            except:
+                pass
     
     def log(self, message: str):
         self.log_callback(message)
@@ -93,14 +78,9 @@ class Downloader:
         try:
             resp = self.ncore.session.get(dl_url, timeout=30)
             if resp.status_code == 200:
-                folder = self.download_path
-                filepath = os.path.join(folder, f"{filename}.torrent")
-                if os.path.exists(filepath):
-                    # Azonos nevű, de másik torrent ne írja felül a meglévőt
-                    filepath = os.path.join(folder, f"{filename} [{ncore_id}].torrent")
+                filepath = os.path.join(self.download_path, f"{filename}.torrent")
                 with open(filepath, "wb") as f:
                     f.write(resp.content)
-                self.last_file = filepath
                 return True
         except Exception as e:
             self.log(f"❌ Hiba: {e}")
